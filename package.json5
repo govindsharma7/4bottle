@@ -1,8 +1,7 @@
 {
   "name": "4q",
   "version": "0.6.0",
-  "description": "the 4q archive format",
-  "main": "./lib/4q/lib4q.js",
+  "description": "command-line 4q archive tools",
   "keywords": [
     "archive",
   ],
@@ -19,6 +18,7 @@
     }
   ],
   "scripts": {
+    "b": "babel --source-maps --out-dir lib src && babel --source-maps --out-dir test/lib test/src",
     "clean": "rm -rf lib test/lib",
     "distclean": "npm run clean && rm -rf node_modules",
     "prepublish": "babel --source-maps --out-dir lib src && babel --source-maps --out-dir test/lib test/src",
@@ -28,16 +28,14 @@
     "doc": "docs",
   },
   "dependencies": {
-    "antsy": "*",
     "bluebird": "*",
+    "clicolor": "*",
     "errno": "*",
+    "lib4q": "*",
     "minimist": "*",
-    "posix": "^2.0.0",
-    "snappy": "*",
     "sprintf": "*",
     "stream-toolkit": "^2.0.0",
-    "strftime": "*",
-    "xz": "^1.1.1",
+    "strftime": "*"
   },
   "devDependencies": {
     "babel": "*",
