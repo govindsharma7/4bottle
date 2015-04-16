@@ -155,7 +155,7 @@ function dumpArchiveFile(filename, { cli, keybaser, isVerbose, isQuiet }) {
       case "file":
       case "folder":
         const nicePrefix = state.prefix.join("/") + (state.prefix.length > 0 ? "/" : "");
-        cli.displayNotice(helpers.summaryLineForFile(cli, bottle.header, nicePrefix, isVerbose));
+        cli.displayVerbose(helpers.summaryLineForFile(cli, bottle.header, nicePrefix, isVerbose));
         state.prefix.push(bottle.header.filename);
         if (!bottle.header.folder) {
           state.totalFiles += 1;

@@ -195,7 +195,7 @@ function main() {
           COLORS.file_size,
           `(${state.fileCount} files, ${cli.toMagnitude(state.totalBytesIn)}B)`
         );
-        cli.displayNotice(`${argv.o} ${inStatus}${compressionStatus}`);
+        cli.displayVerbose(`${argv.o} ${inStatus}${compressionStatus}`);
       });
     });
   }).catch((error) => {
@@ -244,7 +244,7 @@ function printFinishedFile(cli, state) {
   if (!state.currentFilename) return;
   const bytes = state.isFolder ? "     " :
     cli.color(COLORS.file_size, sprintf("%5s", cli.toMagnitude(state.currentFileTotalBytes)));
-  cli.displayNotice(cli.paint("  ", bytes, "  ", state.currentFilename));
+  cli.displayVerbose(cli.paint("  ", bytes, "  ", state.currentFilename));
 }
 
 function conditionally(predicate, f) {
