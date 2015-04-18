@@ -214,13 +214,13 @@ function setupEncryptBottle(keybaser, recipients, targetStream) {
 
   // keybase is the only encryption recipient type, so far.
   recipients = recipients.map((name) => `keybase:${name}`);
-  return lib4q.writeEncryptedBottle(lib4q.ENCRYPTION_AES_256, recipients, encrypter);
+  return lib4q.writeEncryptedBottle(lib4q.ENCRYPTION_AES_256_CTR, recipients, encrypter);
 }
 
 // this is really bad. don't use it.
 function setupPasswordBottle(password, targetStream) {
   return Promise.promisify(crypto.pbkdf2)(password, helpers.SALT, 10000, 48).then((keyBuffer) => {
-    return lib4q.writeEncryptedBottle(lib4q.ENCRYPTION_AES_256, [], keyBuffer);
+    return lib4q.writeEncryptedBottle(lib4q.ENCRYPTION_AES_256_CTR, [], keyBuffer);
   });
 }
 
