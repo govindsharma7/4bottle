@@ -1,21 +1,21 @@
-const clicolor = require("clicolor");
-const crypto = require("crypto");
-const fs = require("fs");
-const helpers = require("./helpers");
-const keybaser = require("./keybaser");
-const lib4q = require("lib4q");
-const minimist = require("minimist");
-const path = require("path");
-const Promise = require("bluebird");
-const sprintf = require("sprintf");
-const strftime = require("strftime");
-const toolkit = require("stream-toolkit");
-const util = require("util");
+"use strict";
 
-require("source-map-support").install();
+import crypto from "crypto";
+import fs from "fs";
+import Keybaser from "./keybaser";
+import minimist from "minimist";
+import path from "path";
+import Promise from "bluebird";
+import sprintf from "sprintf";
+import strftime from "strftime";
+import toolkit from "stream-toolkit";
+import { clicolor } from "clicolor";
+import { COLORS, messageForError, readStream, SALT } from "./helpers";
+import * as lib4bottle from "lib4bottle";
+
+import "source-map-support/register";
 
 const PACKAGE = require("../../package.json");
-const COLORS = helpers.COLORS;
 const NOW = Date.now();
 const HOURS_20 = 20 * 60 * 60 * 1000;
 const DAYS_250 = 250 * 24 * 60 * 60 * 1000;
@@ -39,8 +39,8 @@ options:
 `;
 
 function main() {
-  const cli = clicolor.cli();
-  const keybaser = new (require("./keybaser").Keybaser)(cli);
+  const cli = clicolor();
+  const keybaser = new Keybaser(cli);
 
   const argv = minimist(process.argv.slice(2), {
     boolean: [ "help", "version", "q", "v", "color", "debug", "force" ],
@@ -68,7 +68,7 @@ function main() {
     try {
       fs.mkdirSync(outputFolder);
     } catch (error) {
-      cli.displayError(`Can't create folder ${outputFolder}: ${helpers.messageForError(error)}`);
+      cli.displayError(`Can't create folder ${outputFolder}: ${messageForError(error)}`);
       if (argv.debug) console.log(error.stack);
       process.exit(1);
     }
@@ -88,7 +88,7 @@ function main() {
     cli
   };
   unpackArchiveFiles(argv._, outputFolder, options).catch((error) => {
-    cli.displayError(`Unable to unpack archive: ${helpers.messageForError(error)}`);
+    cli.displayError(`Unable to unpack archive: ${messageForError(error)}`);
     if (argv.debug) console.log(error.stack);
     process.exit(1);
   });
@@ -117,15 +117,15 @@ function unpackArchiveFile(filename, outputFolder, options) {
     state.totalBytesIn = n;
     displayStatus(options.cli, state);
   });
-  helpers.readStream(options.cli, filename, options.debug).pipe(countingInStream);
+  readStream(options.cli, filename, options.debug).pipe(countingInStream);
   let ultimateOutputFolder = outputFolder;
 
-  const reader = new lib4q.ArchiveReader();
+  const reader = new lib4bottle.ArchiveReader();
 
   reader.decryptKey = (keymap) => {
     if (Object.keys(keymap).length == 0) {
       if (!options.password) throw new Error("No password provided.");
-      return Promise.promisify(crypto.pbkdf2)(options.password, helpers.SALT, 10000, 48);
+      return Promise.promisify(crypto.pbkdf2)(options.password, SALT, 10000, 48);
     }
     return options.keybaser.check().then(() => {
       const self = `keybase:${options.keybaser.identity}`;
@@ -189,7 +189,7 @@ function unpackArchiveFile(filename, outputFolder, options) {
   });
 
   reader.on("error", (error) => {
-    options.cli.displayError(`Can't write ${state.currentDestFilename || '?'}: ${helpers.messageForError(error)}`);
+    options.cli.displayError(`Can't write ${state.currentDestFilename || '?'}: ${messageForError(error)}`);
     const code = error.code || (error.cause || {}).code;
     if (code == "EEXIST") options.cli.displayError("Use -f or --force to overwrite existing files.");
     if (options.debug) console.log(error.stack);
@@ -246,6 +246,7 @@ function unpackArchiveFile(filename, outputFolder, options) {
         `(${state.totalFiles} files, ${options.cli.toMagnitude(state.totalBytesOut, 1024)}B)`
       )
     );
+    options.cli.status();
     options.cli.display(`${filename} -> ${outStatus}${extras}`);
   });
 }

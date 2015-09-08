@@ -1,14 +1,15 @@
-const child_process = require("child_process");
-const fs = require("fs");
-const Promise = require("bluebird");
-const toolkit = require("stream-toolkit");
-const util = require("util");
+"use strict";
+
+import child_process from "child_process";
+import fs from "fs";
+import Promise from "bluebird";
+import toolkit from "stream-toolkit";
 
 // keybase support!
 
 const KEYBASE_BINARY = "keybase";
 
-class Keybaser {
+export default class Keybaser {
   constructor(cli) {
     this.cli = cli;
     this.identity = null;
@@ -120,6 +121,3 @@ function waitForProcess(p) {
     });
   });
 }
-
-
-exports.Keybaser = Keybaser;

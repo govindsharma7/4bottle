@@ -1,26 +1,27 @@
-const clicolor = require("clicolor");
-const crypto = require("crypto");
-const fs = require("fs");
-const helpers = require("./helpers");
-const lib4q = require("lib4q");
-const minimist = require("minimist");
-const path = require("path");
-const Promise = require("bluebird");
-const sprintf = require("sprintf");
-const stream = require("stream");
-const strftime = require("strftime");
-const toolkit = require("stream-toolkit");
-const util = require("util");
+"use strict";
 
-require("source-map-support").install();
+import crypto from "crypto";
+import fs from "fs";
+import Keybaser from "./keybaser";
+import minimist from "minimist";
+import path from "path";
+import Promise from "bluebird";
+import sprintf from "sprintf";
+import stream from "stream";
+import strftime from "strftime";
+import toolkit from "stream-toolkit";
+import { clicolor } from "clicolor";
+import { COLORS, messageForError, SALT } from "./helpers";
+import * as lib4bottle from "lib4bottle";
+
+import "source-map-support/register";
 
 const PACKAGE = require("../../package.json");
-const COLORS = helpers.COLORS;
 const NOW = Date.now();
 
 const USAGE = `
 usage: qpack [options] <filename(s)...>
-    create a 4Q archive from a set of files (or folders)
+    create a 4bottle archive from a set of files (or folders)
 
 options:
     --help
@@ -44,8 +45,8 @@ options:
 `;
 
 function main() {
-  const cli = clicolor.cli();
-  const keybaser = new (require("./keybaser").Keybaser)(cli);
+  const cli = clicolor();
+  const keybaser = new Keybaser(cli);
 
   const argv = minimist(process.argv.slice(2), {
     alias: { "Z": "no-compress", "H": "no-hash", "S": "snappy", "e": "encrypt" },
@@ -92,7 +93,7 @@ function main() {
   if (!okay) process.exit(1);
 
   function die(message, error) {
-    cli.displayError(`${message}: ${helpers.messageForError(error)}`);
+    cli.displayError(`${message}: ${messageForError(error)}`);
     if (argv.debug) console.log(error.stack);
     process.exit(1);
   };
@@ -132,7 +133,7 @@ function main() {
     let targetStream = countingOutStream;
 
     if (argv.hash) {
-      const hashBottle = new lib4q.HashBottleWriter(lib4q.HASH_SHA512);
+      const hashBottle = new lib4bottle.HashBottleWriter(lib4bottle.HASH_SHA512);
       hashBottle.pipe(targetStream);
       targetStream = hashBottle;
     }
@@ -151,13 +152,13 @@ function main() {
       }
     ).then(() => {
       if (argv.compress) {
-        const compressionType = argv.snappy ? lib4q.COMPRESSION_SNAPPY : lib4q.COMPRESSION_LZMA2;
-        const compressedBottle = new lib4q.CompressedBottleWriter(compressionType);
+        const compressionType = argv.snappy ? lib4bottle.COMPRESSION_SNAPPY : lib4bottle.COMPRESSION_LZMA2;
+        const compressedBottle = new lib4bottle.CompressedBottleWriter(compressionType);
         compressedBottle.pipe(targetStream);
         targetStream = compressedBottle;
       }
 
-      const writer = new lib4q.ArchiveWriter();
+      const writer = new lib4bottle.ArchiveWriter();
       writer.on("filename", (filename, header) => {
         if (argv.v) printFinishedFile(cli, state);
         state.currentFileBytes = 0;
@@ -199,7 +200,7 @@ function main() {
       });
     });
   }).catch((error) => {
-    cli.displayError(`Unable to write ${argv.o}: ${helpers.messageForError(error)}`);
+    cli.displayError(`Unable to write ${argv.o}: ${messageForError(error)}`);
     if (argv.debug) console.log(error.stack);
     process.exit(1);
   });
@@ -214,13 +215,13 @@ function setupEncryptBottle(keybaser, recipients, targetStream) {
 
   // keybase is the only encryption recipient type, so far.
   recipients = recipients.map((name) => `keybase:${name}`);
-  return lib4q.writeEncryptedBottle(lib4q.ENCRYPTION_AES_256_CTR, recipients, encrypter);
+  return lib4bottle.writeEncryptedBottle(lib4bottle.ENCRYPTION_AES_256_CTR, recipients, encrypter);
 }
 
 // this is really bad. don't use it.
 function setupPasswordBottle(password, targetStream) {
-  return Promise.promisify(crypto.pbkdf2)(password, helpers.SALT, 10000, 48).then((keyBuffer) => {
-    return lib4q.writeEncryptedBottle(lib4q.ENCRYPTION_AES_256_CTR, [], keyBuffer);
+  return Promise.promisify(crypto.pbkdf2)(password, SALT, 10000, 48).then((keyBuffer) => {
+    return lib4bottle.writeEncryptedBottle(lib4bottle.ENCRYPTION_AES_256_CTR, [], keyBuffer);
   });
 }
 

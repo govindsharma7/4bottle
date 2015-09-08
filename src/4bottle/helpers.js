@@ -1,12 +1,14 @@
-const errno = require("errno");
-const fs = require("fs");
-const Promise = require("bluebird");
-const sprintf = require("sprintf");
-const strftime = require("strftime");
+"use strict";
+
+import errno from "errno";
+import fs from "fs";
+import Promise from "bluebird";
+import sprintf from "sprintf";
+import strftime from "strftime";
 
 // some helpers for the command-line tools.
 
-const COLORS = {
+export const COLORS = {
   annotations: "99c",
   executable: "red",
   file_size: "green",
@@ -19,10 +21,10 @@ const COLORS = {
   user_group: "088"
 };
 
-const SALT = "4q";
+export const SALT = "4q";
 
 // read a file into a stream, bailing with sys.exit(1) on errors.
-function readStream(cli, filename, showStack = false) {
+export function readStream(cli, filename, showStack = false) {
   let fd = null;
   try {
     fd = fs.openSync(filename, "r");
@@ -41,7 +43,7 @@ function readStream(cli, filename, showStack = false) {
   return stream;
 }
 
-function messageForError(error) {
+export function messageForError(error) {
   if (error.code) return (errno.code[error.code] || {}).description || error.message;
   return error.message;
 }
@@ -79,7 +81,7 @@ function modeToWire(mode, isFolder) {
   return d + octize((mode >> 6) & 7) + octize((mode >> 3) & 7) + octize(mode & 7);
 }
 
-function summaryLineForFile(cli, stats, prefix, isVerbose) {
+export function summaryLineForFile(cli, stats, prefix, isVerbose) {
   const username = (stats.username || "nobody").slice(0, 8);
   const groupname = (stats.groupname || "nobody").slice(0, 8);
   const size = stats.size != null ? cli.toMagnitude(stats.size, 1024) : "     ";
@@ -100,10 +102,3 @@ function summaryLineForFile(cli, stats, prefix, isVerbose) {
     return cli.paint("  ", colorsize, "  ", filename);
   }
 }
-
-
-exports.COLORS = COLORS;
-exports.messageForError = messageForError;
-exports.readStream = readStream;
-exports.SALT = SALT;
-exports.summaryLineForFile = summaryLineForFile;

@@ -1,21 +1,23 @@
-const clicolor = require("clicolor");
-const crypto = require("crypto");
-const fs = require("fs");
-const helpers = require("./helpers");
-const lib4q = require("lib4q");
-const minimist = require("minimist");
-const Promise = require("bluebird");
-const toolkit = require("stream-toolkit");
-const util = require("util");
+"use strict";
 
-require("source-map-support").install();
+import crypto from "crypto";
+import fs from "fs";
+import Keybaser from "./keybaser";
+import minimist from "minimist";
+import Promise from "bluebird";
+import toolkit from "stream-toolkit";
+import { clicolor } from "clicolor";
+import * as helpers from "./helpers";
+import * as lib4bottle from "lib4bottle";
+
+import "source-map-support/register";
 
 const PACKAGE = require("../../package.json");
 const COLORS = helpers.COLORS;
 
 const USAGE = `
-usage: qls [options] <filename(s)...>
-    displays contents of 4Q archives
+usage: 4ls [options] <filename(s)...>
+    displays contents of 4bottle archives
 
 options:
     --help
@@ -31,9 +33,9 @@ options:
 
 let password = null;
 
-function main() {
-  const cli = clicolor.cli();
-  const keybaser = new (require("./keybaser").Keybaser)(cli);
+export function main() {
+  const cli = clicolor();
+  const keybaser = new Keybaser(cli);
 
   const argv = minimist(process.argv.slice(2), {
     boolean: [ "help", "version", "l", "q", "color", "structure", "debug" ],
@@ -44,11 +46,11 @@ function main() {
     process.exit(0);
   }
   if (argv.version) {
-    console.log(`qls ${PACKAGE.version}`);
+    console.log(`4ls ${PACKAGE.version}`);
     process.exit(0);
   }
   if (argv._.length == 0) {
-    console.log("required: filename of 4Q archive file(s)");
+    console.log("required: filename of 4bottle archive file(s)");
     process.exit(1);
   }
   if (!argv.color) cli.useColor(false);
@@ -75,7 +77,7 @@ function dumpArchiveStructure(filename, { isVerbose, isQuiet, cli, keybaser }) {
     return rv;
   };
 
-  const reader = new lib4q.ArchiveReader();
+  const reader = new lib4bottle.ArchiveReader();
 
   reader.decryptKey = (keymap) => {
     if (Object.keys(keymap).length == 0) {
@@ -90,7 +92,7 @@ function dumpArchiveStructure(filename, { isVerbose, isQuiet, cli, keybaser }) {
     });
   };
 
-  reader.on("start-bottle", (bottle) => {
+  reader.on("start-bottle", bottle => {
     const typeName = cli.color("purple", bottle.typeName());
     let extra = "";
     switch (bottle.typeName()) {
@@ -105,7 +107,7 @@ function dumpArchiveStructure(filename, { isVerbose, isQuiet, cli, keybaser }) {
     indent += 2;
   });
 
-  reader.on("end-bottle", (bottle) => {
+  reader.on("end-bottle", bottle => {
     indent -= 2;
   });
 
@@ -134,10 +136,9 @@ function dumpArchiveFile(filename, { cli, keybaser, isVerbose, isQuiet }) {
     state.totalBytesIn = n;
   });
   helpers.readStream(cli, filename).pipe(countingInStream);
+  const reader = new lib4bottle.ArchiveReader();
 
-  const reader = new lib4q.ArchiveReader();
-
-  reader.decryptKey = (keymap) => {
+  reader.decryptKey = keymap => {
     if (Object.keys(keymap).length == 0) {
       if (password == null) throw new Error("No password provided.");
       return Promise.promisify(crypto.pbkdf2)(password, helpers.SALT, 10000, 48);
@@ -150,7 +151,7 @@ function dumpArchiveFile(filename, { cli, keybaser, isVerbose, isQuiet }) {
     });
   };
 
-  reader.on("start-bottle", (bottle) => {
+  reader.on("start-bottle", bottle => {
     switch (bottle.typeName()) {
       case "file":
       case "folder":
@@ -165,7 +166,7 @@ function dumpArchiveFile(filename, { cli, keybaser, isVerbose, isQuiet }) {
     }
   });
 
-  reader.on("end-bottle", (bottle) => {
+  reader.on("end-bottle", bottle => {
     switch (bottle.typeName()) {
       case "file":
       case "folder":
@@ -210,9 +211,7 @@ function dumpArchiveFile(filename, { cli, keybaser, isVerbose, isQuiet }) {
     extras += annotations.length > 0 ? cli.color(COLORS.annotations, ` [${annotations.join(", ")}]`) : "";
 
     cli.display(`${filename} ${sizes}${extras}`);
-  }).catch((error) => {
+  }).catch(error => {
     cli.displayError(error.stack);
-  })
+  });
 }
-
-exports.main = main;
