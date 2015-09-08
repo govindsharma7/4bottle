@@ -21,8 +21,6 @@ export const COLORS = {
   user_group: "088"
 };
 
-export const SALT = "4q";
-
 // read a file into a stream, bailing with sys.exit(1) on errors.
 export function readStream(cli, filename, showStack = false) {
   let fd = null;
@@ -44,6 +42,7 @@ export function readStream(cli, filename, showStack = false) {
 }
 
 export function messageForError(error) {
+  if (error.cause) return error.message + ": " + messageForError(error.cause);
   if (error.code) return (errno.code[error.code] || {}).description || error.message;
   return error.message;
 }

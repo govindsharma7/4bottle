@@ -6,6 +6,7 @@ import Keybaser from "./keybaser";
 import minimist from "minimist";
 import path from "path";
 import Promise from "bluebird";
+import read from "read";
 import sprintf from "sprintf";
 import strftime from "strftime";
 import toolkit from "stream-toolkit";
@@ -21,8 +22,8 @@ const HOURS_20 = 20 * 60 * 60 * 1000;
 const DAYS_250 = 250 * 24 * 60 * 60 * 1000;
 
 const USAGE = `
-usage: qunpack [options] <filename(s)...>
-    unpacks contents of 4Q archives
+usage: 4unpack [options] <filename(s)...>
+    unpacks contents of 4bottle archives
 
 options:
     --help
@@ -52,11 +53,11 @@ function main() {
     process.exit(0);
   }
   if (argv.version) {
-    console.log(`qunpack ${PACKAGE.version}`)
+    console.log(`4unpack ${PACKAGE.version}`)
     process.exit(0);
   }
   if (argv._.length == 0) {
-    console.log("required: filename of 4Q archive file(s)");
+    console.log("required: filename of 4bottle archive file(s)");
     process.exit(1);
   }
   if (!argv.color) cli.useColor(false);
@@ -83,7 +84,7 @@ function main() {
     isVerbose: argv.v,
     debug: argv.debug,
     force: argv.force,
-    password: argv.password,
+    password: argv["password-here"],
     keybaser,
     cli
   };
@@ -113,27 +114,57 @@ function unpackArchiveFile(filename, outputFolder, options) {
   };
 
   const countingInStream = toolkit.countingStream();
-  countingInStream.on("count", (n) => {
+  countingInStream.on("count", n => {
     state.totalBytesIn = n;
     displayStatus(options.cli, state);
   });
   readStream(options.cli, filename, options.debug).pipe(countingInStream);
   let ultimateOutputFolder = outputFolder;
 
-  const reader = new lib4bottle.ArchiveReader();
-
-  reader.decryptKey = (keymap) => {
-    if (Object.keys(keymap).length == 0) {
-      if (!options.password) throw new Error("No password provided.");
-      return Promise.promisify(crypto.pbkdf2)(options.password, SALT, 10000, 48);
-    }
+  function decryptKey(keymap) {
     return options.keybaser.check().then(() => {
       const self = `keybase:${options.keybaser.identity}`;
       const allowed = Object.keys(keymap).join(", ");
       if (!keymap[self]) throw new Error(`No encryption key for ${self} (only: ${allowed})`);
       return options.keybaser.decrypt(keymap[self]);
     });
+  }
+
+  function getPassword() {
+    const readOptions = { prompt: "Password: ", silent: true, replace: "\u2022" };
+    return options.password ?
+      Promise.resolve(options.password) :
+      Promise.promisify(read)(readOptions).then(([ password ]) => password);
+  }
+
+  function processFile(dataStream) {
+    const countingOutStream = new toolkit.countingStream();
+    countingOutStream.on("count", (n) => {
+      state.currentFileBytes = n;
+      displayStatus(options.cli, state);
+    });
+
+    const realFilename = path.join(outputFolder, state.currentFilename);
+
+    const access = options.force ? "w" : "wx";
+    return Promise.promisify(fs.open)(realFilename, access, state.mode || parseInt("666", 8)).then(fd => {
+      const outStream = fs.createWriteStream(realFilename, { fd });
+      toolkit.promisify(outStream);
+      outStream.on("error", error => reader.emit("error", error));
+      dataStream.pipe(countingOutStream).pipe(outStream);
+      return outStream.finishPromise();
+    }).catch(error => {
+      reader.emit("error", error);
+    });
   };
+
+  function ensureFolder(realFilename) {
+    if (!(fs.existsSync(realFilename) && fs.statSync(realFilename).isDirectory())) {
+      fs.mkdirSync(realFilename);
+    }
+  };
+
+  const reader = new lib4bottle.ArchiveReader({ decryptKey, getPassword, processFile });
 
   reader.on("start-bottle", (bottle) => {
     switch (bottle.typeName()) {
@@ -177,51 +208,24 @@ function unpackArchiveFile(filename, outputFolder, options) {
   });
 
   reader.on("compress", (bottle) => {
-    // FIXME display something if this is per-file
+    // FIXME display something if this is per-file.
     if (state.prefix.length == 0) state.compression = bottle.header.compressionName;
   });
 
   reader.on("encrypt", (bottle) => {
     if (state.prefix.length == 0) {
       state.encryption = bottle.header.encryptionName;
-      if (bottle.header.recipients.length > 0) state.encryptedFor = bottle.header.recipients.join(" & ");
+      if (bottle.header.recipients) state.encryptedFor = bottle.header.recipients.join(" & ");
     }
   });
 
-  reader.on("error", (error) => {
+  reader.on("error", error => {
     options.cli.displayError(`Can't write ${state.currentDestFilename || '?'}: ${messageForError(error)}`);
     const code = error.code || (error.cause || {}).code;
     if (code == "EEXIST") options.cli.displayError("Use -f or --force to overwrite existing files.");
     if (options.debug) console.log(error.stack);
     process.exit(1);
   });
-
-  reader.processFile = (dataStream) => {
-    const countingOutStream = new toolkit.countingStream();
-    countingOutStream.on("count", (n) => {
-      state.currentFileBytes = n;
-      displayStatus(options.cli, state);
-    });
-
-    const realFilename = path.join(outputFolder, state.currentFilename);
-
-    const access = options.force ? "w" : "wx";
-    return Promise.promisify(fs.open)(realFilename, access, state.mode || parseInt("666", 8)).then((fd) => {
-      const outStream = fs.createWriteStream(realFilename, { fd });
-      toolkit.promisify(outStream);
-      outStream.on("error", (error) => reader.emit("error", error));
-      dataStream.pipe(countingOutStream).pipe(outStream);
-      return outStream.finishPromise();
-    }).catch((error) => {
-      reader.emit("error", error);
-    });
-  };
-
-  const ensureFolder = (realFilename) => {
-    if (!(fs.existsSync(realFilename) && fs.statSync(realFilename).isDirectory())) {
-      fs.mkdirSync(realFilename);
-    }
-  };
 
   return reader.scanStream(countingInStream).then(() => {
     const bytesInHuman = options.cli.toMagnitude(state.totalBytesIn, 1024);

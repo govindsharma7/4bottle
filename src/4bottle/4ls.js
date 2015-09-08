@@ -5,6 +5,7 @@ import fs from "fs";
 import Keybaser from "./keybaser";
 import minimist from "minimist";
 import Promise from "bluebird";
+import read from "read";
 import toolkit from "stream-toolkit";
 import { clicolor } from "clicolor";
 import * as helpers from "./helpers";
@@ -55,7 +56,8 @@ export function main() {
   }
   if (!argv.color) cli.useColor(false);
   cli.quiet(argv.q);
-  if (argv.password) password = argv.password;
+
+  if (argv["password-here"]) password = argv["password-here"];
 
   const loudness = { isVerbose: argv.l, isQuiet: argv.q, cli, keybaser };
   (argv.structure ? dumpArchiveStructures(argv._, loudness) : dumpArchiveFiles(argv._, loudness)).catch((error) => {
@@ -77,20 +79,23 @@ function dumpArchiveStructure(filename, { isVerbose, isQuiet, cli, keybaser }) {
     return rv;
   };
 
-  const reader = new lib4bottle.ArchiveReader();
-
-  reader.decryptKey = (keymap) => {
-    if (Object.keys(keymap).length == 0) {
-      if (password == null) throw new Error("No password provided.");
-      return Promise.promisify(crypto.pbkdf2)(password, helpers.SALT, 10000, 48);
-    }
+  function decryptKey(keymap) {
     return keybaser.check().then(() => {
       const self = `keybase:${keybaser.identity}`;
       const allowed = Object.keys(keymap).join(", ");
       if (!keymap[self]) throw new Error(`No encryption key for ${self} (only: ${allowed})`);
       return keybaser.decrypt(keymap[self]);
     });
-  };
+  }
+
+  function getPassword() {
+    const readOptions = { prompt: "Password: ", silent: true, replace: "\u2022" };
+    return password ?
+      Promise.resolve(password) :
+      Promise.promisify(read)(readOptions).then(([ password ]) => password);
+  }
+
+  const reader = new lib4bottle.ArchiveReader({ decryptKey, getPassword });
 
   reader.on("start-bottle", bottle => {
     const typeName = cli.color("purple", bottle.typeName());
@@ -136,13 +141,15 @@ function dumpArchiveFile(filename, { cli, keybaser, isVerbose, isQuiet }) {
     state.totalBytesIn = n;
   });
   helpers.readStream(cli, filename).pipe(countingInStream);
-  const reader = new lib4bottle.ArchiveReader();
 
-  reader.decryptKey = keymap => {
-    if (Object.keys(keymap).length == 0) {
-      if (password == null) throw new Error("No password provided.");
-      return Promise.promisify(crypto.pbkdf2)(password, helpers.SALT, 10000, 48);
-    }
+  function getPassword() {
+    const readOptions = { prompt: "Password: ", silent: true, replace: "\u2022" };
+    return password ?
+      Promise.resolve(password) :
+      Promise.promisify(read)(readOptions).then(([ password ]) => password);
+  }
+
+  function decryptKey(keymap) {
     return keybaser.check().then(() => {
       const self = `keybase:${keybaser.identity}`;
       const allowed = Object.keys(keymap).join(", ");
@@ -150,6 +157,8 @@ function dumpArchiveFile(filename, { cli, keybaser, isVerbose, isQuiet }) {
       return keybaser.decrypt(keymap[self]);
     });
   };
+
+  const reader = new lib4bottle.ArchiveReader({ decryptKey, getPassword });
 
   reader.on("start-bottle", bottle => {
     switch (bottle.typeName()) {
@@ -181,16 +190,16 @@ function dumpArchiveFile(filename, { cli, keybaser, isVerbose, isQuiet }) {
     if (state.prefix.length == 0) state.validHash = bottle.header.hashName;
   });
 
-  reader.on("compress", (bottle) => {
+  reader.on("compress", bottle => {
     // FIXME display something if this is per-file
     if (state.prefix.length == 0) state.compression = bottle.header.compressionName;
   });
 
-  reader.on("encrypt", (bottle) => {
+  reader.on("encrypt", bottle => {
     // FIXME display something if this is per-file
     if (state.prefix.length == 0) {
       state.encryption = bottle.header.encryptionName;
-      if (bottle.header.recipients.length > 0) state.encryptedFor = bottle.header.recipients.join(" & ");
+      if (bottle.header.recipients) state.encryptedFor = bottle.header.recipients.join(" & ");
     }
   });
 
