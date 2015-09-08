@@ -38,7 +38,6 @@ To unpack the archive `secret.4b` into a new temporary folder:
 
 ## TODO
 
-- fix bullshit salt on password
 - signed bottles
 - force-overwrite mode for 4unpack
 
