@@ -1,8 +1,8 @@
-# 4Q
+# 4bottle
 
-4Q: the final archive format.
+4bottle: the final archive format.
 
-4Q is a data & file format for archiving collections of files & folders, like "tar", "zip", and "winrar". Its primary differentiating features are:
+4bottle is a data & file format for archiving collections of files & folders, like "tar", "zip", and "winrar". Its primary differentiating features are:
 
 - All important unix/posix attributes are preserved (owner, group, permissions, create/modify timestamps).
 - The format is streamable: Files may be unpacked as an archive is read, and an archive may be written with minimal buffering.
@@ -19,27 +19,34 @@ There are some missing features that I'd like (listed in the TODO section below)
 
 All of the command-line tools respond to `--help`.
 
-To create an archive of the folder `myfiles`, called `myfiles.4q`:
+To create an archive of the folder `myfiles`, called `myfiles.4b`:
 
-    $ qpack myfiles
+    $ 4pack myfiles
 
-To encrypt a folder of source code for keybase user robey, into an archive named `secret.4q`:
+To encrypt a folder of source code for keybase user robey, into an archive named `secret.4b`:
 
-    $ qpack -e robey -o secret.4q src/main/wibble/
+    $ 4pack -e robey -o secret.4b src/main/wibble/
 
-To list the files in an archive called `myfiles.4q`:
+To list the files in an archive called `myfiles.4b`:
 
-    $ qls myfiles.4q
+    $ 4ls myfiles.4b
 
-To unpack the archive `secret.4q` into a new temporary folder:
+To unpack the archive `secret.4b` into a new temporary folder:
 
-    $ qunpack secret.4q -o temp
+    $ 4unpack secret.4b -o temp
+
 
 ## TODO
 
+- fix bullshit salt on password
 - signed bottles
+- force-overwrite mode for 4unpack
+
+### blockers for 1.0
+
+### later
+
 - support symbolic links
-- force-overwrite mode for qunpack
-- qunpack should preserve ownership by default when running as root
-- qunpack should have an option to ignore ownership, and one to ignore permissions
+- 4unpack should preserve ownership by default when running as root
+- 4unpack should have an option to ignore ownership, and one to ignore permissions
 - sparse files
